@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>リマインダー</title>
+
+<!-- iOS ホーム画面追加対応 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="リマインダー">
+<meta name="theme-color" content="#2B3A32">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --board: #2B3A32;
+    --board-dark: #1E2A24;
+    --board-light: #3A4C42;
+    --chalk: #F5F3EA;
+    --chalk-dim: #C9CEC5;
+    --chalk-yellow: #F2C94C;
+    --chalk-blue: #8FC1DE;
+    --chalk-red: #E2685A;
+    --line: rgba(245, 243, 234, 0.14);
+    --shadow: rgba(0, 0, 0, 0.25);
+    --radius: 14px;
+    --font-display: 'Klee One', sans-serif;
+    --font-body: 'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--board);
+    color: var(--chalk);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  body {
+    /* chalkboard texture: faint noise via layered radial gradients */
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(255,255,255,0.025) 0, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(255,255,255,0.02) 0, transparent 45%),
+      radial-gradient(circle at 60% 15%, rgba(255,255,255,0.02) 0, transparent 35%);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 18px 40px;
+  }
+
+  header {
+    padding: calc(env(safe-area-inset-top) + 22px) 4px 18px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px dashed var(--line);
+    margin-bottom: 20px;
+  }
+
+  header h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 26px;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+
+  header .count {
+    font-size: 13px;
+    color: var(--chalk-dim);
+    white-space: nowrap;
+  }
+
+  /* --- input card --- */
+  .add-card {
+    background: var(--board-light);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+    margin-bottom: 26px;
+    border: 1px solid var(--line);
+  }
+
+  .add-card input[type="text"] {
+    width: 100%;
+    background: var(--chalk);
+    color: var(--board-dark);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 16px;
+    font-family: var(--font-body);
+    margin-bottom: 10px;
+  }
+
+  .add-card input[type="text"]::placeholder {
+    color: #7C8479;
+  }
+
+  .row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .date-field {
+    flex: 1;
+    position: relative;
+  }
+
+  .date-field label {
+    position: absolute;
+    top: -8px;
+    left: 10px;
+    font-size: 10px;
+    background: var(--board-light);
+    padding: 0 5px;
+    color: var(--chalk-dim);
+    border-radius: 4px;
+  }
+
+  .add-card input[type="date"] {
+    width: 100%;
+    background: var(--chalk);
+    color: var(--board-dark);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 10px;
+    font-size: 15px;
+    font-family: var(--font-body);
+  }
+
+  .add-btn {
+    background: var(--chalk-yellow);
+    color: var(--board-dark);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.12s ease, opacity 0.12s ease;
+  }
+
+  .add-btn:active { transform: scale(0.96); }
+  .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* --- list --- */
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--board-light);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 13px 14px;
+  }
+
+  .checkbox {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--chalk-dim);
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .checkbox svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0;
+    stroke: var(--board);
+  }
+
+  .item.done .checkbox {
+    background: var(--chalk-yellow);
+    border-color: var(--chalk-yellow);
+  }
+
+  .item.done .checkbox svg { opacity: 1; }
+
+  .item-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-content {
+    font-size: 15.5px;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .item.done .item-content {
+    text-decoration: line-through;
+    color: var(--chalk-dim);
+  }
+
+  .chip {
+    display: inline-block;
+    margin-top: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
+  }
+
+  .chip.none { background: rgba(242,201,76,0.18); color: var(--chalk-yellow); border: 1px dashed rgba(242,201,76,0.5); }
+  .chip.future { background: rgba(143,193,222,0.18); color: var(--chalk-blue); }
+  .chip.today { background: rgba(226,104,90,0.25); color: #FFB4A8; }
+  .chip.overdue { background: rgba(226,104,90,0.3); color: var(--chalk-red); }
+
+  .delete-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--chalk-dim);
+    cursor: pointer;
+    padding: 6px;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .delete-btn:active { color: var(--chalk-red); }
+
+  .empty {
+    text-align: center;
+    color: var(--chalk-dim);
+    padding: 40px 10px;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .completed-toggle {
+    margin-top: 26px;
+    background: none;
+    border: none;
+    color: var(--chalk-dim);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .completed-toggle .arrow {
+    display: inline-block;
+    transition: transform 0.15s ease;
+  }
+
+  .completed-toggle.open .arrow { transform: rotate(90deg); }
+
+  .completed-list {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .completed-list.open { display: flex; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>リマインダー</h1>
+    <span class="count" id="count"></span>
+  </header>
+
+  <div class="add-card">
+    <input type="text" id="contentInput" placeholder="内容を入力（例：小テストの採点）" maxlength="200">
+    <div class="row">
+      <div class="date-field">
+        <label>期限（任意）</label>
+        <input type="date" id="deadlineInput">
+      </div>
+      <button class="add-btn" id="addBtn">追加</button>
+    </div>
+  </div>
+
+  <div class="list" id="activeList"></div>
+  <div class="empty" id="emptyMsg" style="display:none;">まだリマインダーがありません。<br>上の欄から追加してみましょう。</div>
+
+  <button class="completed-toggle" id="completedToggle" style="display:none;">
+    <span class="arrow">▸</span>
+    <span id="completedLabel">完了済み</span>
+  </button>
+  <div class="completed-list" id="completedList"></div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'reminders-app-v1';
+
+  function loadReminders() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveReminders(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+
+  let reminders = loadReminders();
+  let completedOpen = false;
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function formatDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const days = ['日','月','火','水','木','金','土'];
+    return `${m}/${d}(${days[date.getDay()]})`;
+  }
+
+  function deadlineStatus(iso) {
+    const today = todayStr();
+    if (iso < today) return 'overdue';
+    if (iso === today) return 'today';
+    return 'future';
+  }
+
+  function sortReminders(list) {
+    return [...list].sort((a, b) => {
+      if (!a.deadline && !b.deadline) return b.createdAt - a.createdAt;
+      if (!a.deadline) return -1;
+      if (!b.deadline) return 1;
+      if (a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
+      return b.createdAt - a.createdAt;
+    });
+  }
+
+  function render() {
+    const active = sortReminders(reminders.filter(r => !r.completed));
+    const completed = reminders.filter(r => r.completed).sort((a,b) => b.completedAt - a.completedAt);
+
+    const activeList = document.getElementById('activeList');
+    const emptyMsg = document.getElementById('emptyMsg');
+    const countEl = document.getElementById('count');
+    const completedToggle = document.getElementById('completedToggle');
+    const completedListEl = document.getElementById('completedList');
+    const completedLabel = document.getElementById('completedLabel');
+
+    countEl.textContent = active.length > 0 ? `残り ${active.length} 件` : '';
+
+    activeList.innerHTML = '';
+    if (active.length === 0) {
+      emptyMsg.style.display = reminders.length === 0 ? 'block' : 'none';
+    } else {
+      emptyMsg.style.display = 'none';
+    }
+
+    active.forEach(r => activeList.appendChild(renderItem(r)));
+
+    if (completed.length === 0) {
+      completedToggle.style.display = 'none';
+      completedListEl.classList.remove('open');
+    } else {
+      completedToggle.style.display = 'flex';
+      completedLabel.textContent = `完了済み (${completed.length})`;
+      completedListEl.innerHTML = '';
+      completed.forEach(r => completedListEl.appendChild(renderItem(r)));
+    }
+  }
+
+  function renderItem(r) {
+    const item = document.createElement('div');
+    item.className = 'item' + (r.completed ? ' done' : '');
+
+    const checkbox = document.createElement('button');
+    checkbox.className = 'checkbox';
+    checkbox.setAttribute('aria-label', r.completed ? '未完了に戻す' : '完了にする');
+    checkbox.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    checkbox.onclick = () => toggleComplete(r.id);
+
+    const body = document.createElement('div');
+    body.className = 'item-body';
+
+    const content = document.createElement('div');
+    content.className = 'item-content';
+    content.textContent = r.content;
+    body.appendChild(content);
+
+    const chip = document.createElement('span');
+    if (!r.deadline) {
+      chip.className = 'chip none';
+      chip.textContent = '期限なし';
+    } else {
+      const status = deadlineStatus(r.deadline);
+      chip.className = 'chip ' + status;
+      const label = formatDate(r.deadline);
+      chip.textContent = status === 'overdue' ? `${label}（期限超過）` : status === 'today' ? `${label}（今日）` : label;
+    }
+    body.appendChild(chip);
+
+    const del = document.createElement('button');
+    del.className = 'delete-btn';
+    del.setAttribute('aria-label', '削除');
+    del.textContent = '✕';
+    del.onclick = () => deleteReminder(r.id);
+
+    item.appendChild(checkbox);
+    item.appendChild(body);
+    item.appendChild(del);
+    return item;
+  }
+
+  function toggleComplete(id) {
+    const r = reminders.find(x => x.id === id);
+    if (!r) return;
+    r.completed = !r.completed;
+    r.completedAt = r.completed ? Date.now() : null;
+    saveReminders(reminders);
+    render();
+  }
+
+  function deleteReminder(id) {
+    reminders = reminders.filter(x => x.id !== id);
+    saveReminders(reminders);
+    render();
+  }
+
+  function addReminder() {
+    const contentInput = document.getElementById('contentInput');
+    const deadlineInput = document.getElementById('deadlineInput');
+    const content = contentInput.value.trim();
+    if (!content) {
+      contentInput.focus();
+      return;
+    }
+    reminders.push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      content,
+      deadline: deadlineInput.value || null,
+      completed: false,
+      createdAt: Date.now(),
+      completedAt: null
+    });
+    saveReminders(reminders);
+    contentInput.value = '';
+    deadlineInput.value = '';
+    contentInput.focus();
+    render();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', addReminder);
+  document.getElementById('contentInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addReminder();
+  });
+  document.getElementById('completedToggle').addEventListener('click', () => {
+    completedOpen = !completedOpen;
+    document.getElementById('completedToggle').classList.toggle('open', completedOpen);
+    document.getElementById('completedList').classList.toggle('open', completedOpen);
+  });
+
+  render();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>

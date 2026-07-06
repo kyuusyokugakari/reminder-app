@@ -1,0 +1,24 @@
+{
+  "name": "リマインダー",
+  "short_name": "リマインダー",
+  "description": "内容と期限を登録できるシンプルなリマインダーアプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#2B3A32",
+  "theme_color": "#2B3A32",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
